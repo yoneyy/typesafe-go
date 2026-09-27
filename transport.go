@@ -30,6 +30,12 @@ type ApiRespError struct {
 }
 
 func (c *Client) doRaw(ctx context.Context, method string, path string, body any) ([]byte, error) {
+	if c.timeout > 0 && ctx != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, c.timeout)
+		defer cancel()
+	}
+
 	var bodyByte []byte
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -53,7 +59,7 @@ func (c *Client) doRaw(ctx context.Context, method string, path string, body any
 		if bodyByte != nil {
 			rd = bytes.NewReader(bodyByte)
 		}
-		req, err := http.NewRequestWithContext(ctx, up.String(), method, rd)
+		req, err := http.NewRequestWithContext(ctx, method, up.String(), rd)
 		if err != nil {
 			return nil, fmt.Errorf("typesafe: built request: %w", err)
 		}
@@ -71,8 +77,8 @@ func (c *Client) doRaw(ctx context.Context, method string, path string, body any
 			continue
 		}
 
-		defer resp.Body.Close()
 		respBody, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
 		if err != nil {
 			return nil, fmt.Errorf("typesafe: read response body: %w", err)
 		}
@@ -84,13 +90,16 @@ func (c *Client) doRaw(ctx context.Context, method string, path string, body any
 				Body:       respBody,
 			}
 			var apiRespErr ApiRespError
-			if err := json.Unmarshal(respBody, &apiRespErr); err != nil {
+			if err := json.Unmarshal(respBody, &apiRespErr); err == nil {
 				apiErr.Detail = apiRespErr.Detail
 			}
 			if resp.StatusCode == http.StatusTooManyRequests ||
 				resp.StatusCode >= http.StatusInternalServerError {
 				retryAfter := resp.Header.Get("Retry-After")
 				if !c.retryWait(ctx, attempt, c.retryAfter(retryAfter)) {
+					if err := ctx.Err(); err != nil {
+						return nil, fmt.Errorf("typesafe: retry: %w", err)
+					}
 					return nil, apiErr
 				}
 				continue

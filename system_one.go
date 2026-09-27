@@ -35,8 +35,8 @@ type Answer interface {
 	T() AnswerType
 }
 type Usage struct {
-	InputToken  int64 `json:"input_token"`
-	OutputToken int64 `json:"output_token"`
+	InputTokens  int64 `json:"input_tokens"`
+	OutputTokens int64 `json:"output_tokens"`
 }
 
 type ChoiceAnswer struct {
