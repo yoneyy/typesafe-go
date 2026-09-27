@@ -16,7 +16,7 @@ var (
 type SystemOneResponse struct {
 	Model   string            `json:"model"`
 	Usage   Usage             `json:"usage"`
-	Answers map[string]Answer `json:"-"`
+	Answers map[string]Answer `json:"answers"`
 }
 
 type AnswerType string

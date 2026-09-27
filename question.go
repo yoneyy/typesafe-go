@@ -58,7 +58,7 @@ func (s *Score) MarshalJSON() ([]byte, error) {
 
 type Noul struct {
 	Instructions Pandora `json:"instructions"`
-	Criteria     Object  `json:"criteria"`
+	Criteria     Object  `json:"criteria,omitempty"`
 }
 
 func (*Noul) T() QuestionType { return QuestionTypeNoul }
