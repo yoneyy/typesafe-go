@@ -12,7 +12,7 @@ type Model struct {
 }
 
 const (
-	ModelsPath = "/v1/models"
+	ModelsPath = "/models"
 )
 
 func (c *Client) Models(ctx context.Context) ([]Model, error) {

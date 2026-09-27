@@ -5,39 +5,39 @@ import (
 	"time"
 )
 
-type ClientOptions func(*Client)
+type ClientOption func(*Client)
 
-func WithBaseURL(baseURL string) ClientOptions {
+func WithBaseURL(baseURL string) ClientOption {
 	return func(c *Client) {
 		c.baseURL = baseURL
 	}
 }
 
-func WithModel(model string) ClientOptions {
+func WithModel(model string) ClientOption {
 	return func(c *Client) {
 		c.model = model
 	}
 }
 
-func WithApiKey(key string) ClientOptions {
+func WithApiKey(key string) ClientOption {
 	return func(c *Client) {
 		c.apiKey = key
 	}
 }
 
-func WithHTTPClient(client *http.Client) ClientOptions {
+func WithHTTPClient(client *http.Client) ClientOption {
 	return func(c *Client) {
 		c.httpClient = client
 	}
 }
 
-func WithTimeout(timeout time.Duration) ClientOptions {
+func WithTimeout(timeout time.Duration) ClientOption {
 	return func(c *Client) {
 		c.timeout = timeout
 	}
 }
 
-func WithMaxRetries(maxRetries int) ClientOptions {
+func WithMaxRetries(maxRetries int) ClientOption {
 	return func(c *Client) {
 		c.maxRetries = maxRetries
 	}

@@ -8,7 +8,7 @@ import (
 
 const (
 	defaultModel      = "jev-latest"
-	defaultBaseURL    = "https://api.typesafe.ai"
+	defaultBaseURL    = "https://api.typesafe.ai/v1"
 	defaultTimeout    = 1 * time.Minute
 	defaultMaxRetries = 3
 )
@@ -36,8 +36,8 @@ func defaultClient() *Client {
 // DefaultClientOptions read from the environment(TYPESAFE_BASE_URL,
 // TYPESAFE_MODEL, TYPESAFE_API_KEY).
 // This should be used to initialize new clients.
-func DefaultClientOptions() []ClientOptions {
-	opts := make([]ClientOptions, 0)
+func DefaultClientOptions() []ClientOption {
+	opts := make([]ClientOption, 0)
 	if o, ok := os.LookupEnv("TYPESAFE_BASE_URL"); ok {
 		opts = append(opts, WithBaseURL(o))
 	}
@@ -50,7 +50,7 @@ func DefaultClientOptions() []ClientOptions {
 	return opts
 }
 
-func NewClient(opts ...ClientOptions) *Client {
+func NewClient(opts ...ClientOption) *Client {
 	c := defaultClient()
 	defaultOpts := DefaultClientOptions()
 	opts = append(defaultOpts, opts...)
