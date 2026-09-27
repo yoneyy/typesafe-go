@@ -1,0 +1,8 @@
+.DS_Store
+.env
+*.test
+
+go.work
+go.work.sum
+
+*ignore.*

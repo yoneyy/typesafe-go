@@ -1,0 +1,139 @@
+package typesafe
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"time"
+)
+
+type ApiError struct {
+	StatusCode int
+	Detail     json.RawMessage
+	Body       []byte
+}
+
+func (e ApiError) Error() string {
+	if len(e.Detail) > 0 {
+		return fmt.Sprintf("typesafe: http %d: %s", e.StatusCode, e.Detail)
+	}
+	return fmt.Sprintf("typesafe: http %d: %s", e.StatusCode, e.Body)
+}
+
+type ApiRespError struct {
+	Detail json.RawMessage `json:"detail"`
+}
+
+func (c *Client) doRaw(ctx context.Context, method string, path string, body any) ([]byte, error) {
+	var bodyByte []byte
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			return nil, err
+		}
+		bodyByte = b
+	}
+
+	up, err := url.Parse(c.baseURL)
+	if err != nil {
+		return nil, err
+	}
+	up, err = up.Parse(path)
+	if err != nil {
+		return nil, err
+	}
+
+	for attempt := 0; ; attempt++ {
+		var rd io.Reader
+		if bodyByte != nil {
+			rd = bytes.NewReader(bodyByte)
+		}
+		req, err := http.NewRequestWithContext(ctx, up.String(), method, rd)
+		if err != nil {
+			return nil, fmt.Errorf("typesafe: built request: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+		if bodyByte != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			reqErr := fmt.Errorf("typesafe: request: %w", err)
+			if !c.retryWait(ctx, attempt, 0) {
+				return nil, reqErr
+			}
+			continue
+		}
+
+		defer resp.Body.Close()
+		respBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("typesafe: read response body: %w", err)
+		}
+
+		if resp.StatusCode < http.StatusOK ||
+			resp.StatusCode >= http.StatusMultipleChoices {
+			apiErr := ApiError{
+				StatusCode: resp.StatusCode,
+				Body:       respBody,
+			}
+			var apiRespErr ApiRespError
+			if err := json.Unmarshal(respBody, &apiRespErr); err != nil {
+				apiErr.Detail = apiRespErr.Detail
+			}
+			if resp.StatusCode == http.StatusTooManyRequests ||
+				resp.StatusCode >= http.StatusInternalServerError {
+				retryAfter := resp.Header.Get("Retry-After")
+				if !c.retryWait(ctx, attempt, c.retryAfter(retryAfter)) {
+					return nil, apiErr
+				}
+				continue
+			}
+			return nil, apiErr
+		}
+
+		return respBody, nil
+	}
+}
+
+func (c *Client) do(ctx context.Context, method string, path string, body, result any) error {
+	resp, err := c.doRaw(ctx, method, path, body)
+	if err != nil {
+		return err
+	}
+	if result != nil {
+		if err := json.Unmarshal(resp, result); err != nil {
+			return fmt.Errorf("typesafe: unmarshal response: %w", err)
+		}
+	}
+	return nil
+}
+
+func (c *Client) retryWait(ctx context.Context, attempt int, wait time.Duration) bool {
+	if attempt >= c.maxRetries {
+		return false
+	}
+	if wait <= 0 {
+		wait = time.Duration(200*(1<<attempt)) * time.Millisecond
+	}
+	select {
+	case <-ctx.Done():
+		return false
+	case <-time.After(wait):
+		return true
+	}
+}
+
+func (c *Client) retryAfter(v string) time.Duration {
+	secs, err := strconv.Atoi(v)
+	if err != nil || secs < 0 {
+		return 0
+	}
+	return time.Duration(secs) * time.Second
+}
