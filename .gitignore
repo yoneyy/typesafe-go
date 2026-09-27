@@ -1,6 +1,7 @@
 .DS_Store
 .env
 *.test
+.idea
 
 go.work
 go.work.sum
