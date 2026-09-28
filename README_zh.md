@@ -68,6 +68,8 @@ func main() {
 | `Score` | 按有序等级评分 | 必填 `Array`，包含 2–10 个等级描述 |
 | `Noul` | 提出是/否问题 | 可选 `Object`，描述 `true` 和 `false` |
 
+`Choice`、`Score` 和 `Noul` 都可以使用值或指针。放入 `Questions` 时，值会被复制；如果希望之后修改原结构体的字段时也更新请求中的问题，请使用指针。
+
 一次调用可以针对同一份状态提出不同类型的问题：
 
 ```go
@@ -84,7 +86,7 @@ questions := typesafe.Questions{
 			"product":  "应用程序行为",
 		},
 	},
-	"impact": &typesafe.Score{
+	"impact": typesafe.Score{
 		Instructions: typesafe.String("对用户的影响有多严重？"),
 		Criteria:     typesafe.Array{"轻微", "中等", "严重"},
 	},

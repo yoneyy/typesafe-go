@@ -20,6 +20,14 @@ func TestQuestionMarshalJSON(t *testing.T) {
 			want: `{"type":"choice","instructions":"Choose a team","criteria":{"platform":"Infrastructure","product":null}}`,
 		},
 		{
+			name: "choice value",
+			q: Choice{
+				Instructions: String("Choose a team"),
+				Criteria:     Object{"platform": "Infrastructure", "product": nil},
+			},
+			want: `{"type":"choice","instructions":"Choose a team","criteria":{"platform":"Infrastructure","product":null}}`,
+		},
+		{
 			name: "score with object instructions",
 			q: &Score{
 				Instructions: Object{"question": "Rate impact", "context": []string{"checkout", "payments"}},
@@ -28,11 +36,24 @@ func TestQuestionMarshalJSON(t *testing.T) {
 			want: `{"type":"score","instructions":{"question":"Rate impact","context":["checkout","payments"]},"criteria":["Low",{"level":"High"}]}`,
 		},
 		{
+			name: "score value",
+			q: Score{
+				Instructions: String("Rate impact"),
+				Criteria:     Array{String("Low"), String("High")},
+			},
+			want: `{"type":"score","instructions":"Rate impact","criteria":["Low","High"]}`,
+		},
+		{
 			name: "noul with array instructions and omitted criteria",
 			q: &Noul{
 				Instructions: Array{String("Is this urgent?"), Object{"policy": "Escalate outages"}},
 			},
 			want: `{"type":"noul","instructions":["Is this urgent?",{"policy":"Escalate outages"}]}`,
+		},
+		{
+			name: "noul value with omitted criteria",
+			q:    Noul{Instructions: String("Is this urgent?")},
+			want: `{"type":"noul","instructions":"Is this urgent?"}`,
 		},
 		{
 			name: "noul with criteria",
@@ -80,8 +101,11 @@ func TestQuestionTypes(t *testing.T) {
 		question Question
 		want     QuestionType
 	}{
+		{Choice{}, QuestionTypeChoice},
 		{&Choice{}, QuestionTypeChoice},
+		{Score{}, QuestionTypeScore},
 		{&Score{}, QuestionTypeScore},
+		{Noul{}, QuestionTypeNoul},
 		{&Noul{}, QuestionTypeNoul},
 	}
 	for _, tt := range tests {

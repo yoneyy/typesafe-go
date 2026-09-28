@@ -68,6 +68,8 @@ func main() {
 | `Score` | Rate against ordered levels | Required `Array` of 2–10 level descriptions |
 | `Noul` | Ask a yes/no question | Optional `Object` describing `true` and `false` |
 
+`Choice`, `Score`, and `Noul` can each be passed as a value or a pointer. A value is copied when added to `Questions`; use a pointer if later changes to the original struct should be reflected in the request.
+
 For example, a single call can ask different kinds of questions about the same state:
 
 ```go
@@ -84,7 +86,7 @@ questions := typesafe.Questions{
 			"product":  "Application behavior",
 		},
 	},
-	"impact": &typesafe.Score{
+	"impact": typesafe.Score{
 		Instructions: typesafe.String("How severe is the customer impact?"),
 		Criteria:     typesafe.Array{"Low", "Moderate", "High"},
 	},

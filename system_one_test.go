@@ -106,7 +106,8 @@ func TestSystemOneRequestAndModelOverride(t *testing.T) {
 	if first.Model != "jev-1.13.0" || first.Nouls()["urgent"].Noul != 0.9 {
 		t.Fatalf("unexpected decoded response: %+v", first)
 	}
-	if _, err := client.SystemOne(context.Background(), state, questions); err != nil {
+	valueQuestions := Questions{"urgent": Noul{Instructions: String("Is this urgent?")}}
+	if _, err := client.SystemOne(context.Background(), state, valueQuestions); err != nil {
 		t.Fatal(err)
 	}
 	if client.model != "default-model" || len(requestBodies) != 2 {
