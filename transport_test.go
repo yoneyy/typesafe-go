@@ -50,6 +50,33 @@ func TestApiErrorMessage(t *testing.T) {
 	}
 }
 
+func TestTransportPreservesBaseURLPath(t *testing.T) {
+	tests := []struct {
+		name    string
+		baseURL string
+		path    string
+		wantURL string
+	}{
+		{"version prefix", "https://api.typesafe.ai/v1", SystemOnePath, "https://api.typesafe.ai/v1/systemone"},
+		{"version prefix with trailing slash", "https://api.typesafe.ai/v1/", SystemOnePath, "https://api.typesafe.ai/v1/systemone"},
+		{"root URL", "https://example.test", ModelsPath, "https://example.test/models"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := clientWithTransport(func(req *http.Request) (*http.Response, error) {
+				if got := req.URL.String(); got != tt.wantURL {
+					t.Errorf("request URL = %q, want %q", got, tt.wantURL)
+				}
+				return testResponse(http.StatusOK, `{}`), nil
+			})
+			client.baseURL = tt.baseURL
+			if _, err := client.doRaw(context.Background(), http.MethodPost, tt.path, nil); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestTransportNonRetryableErrors(t *testing.T) {
 	tests := []struct {
 		name       string

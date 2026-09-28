@@ -25,10 +25,6 @@ func (e ApiError) Error() string {
 	return fmt.Sprintf("typesafe: http %d: %s", e.StatusCode, e.Body)
 }
 
-type ApiRespError struct {
-	Detail json.RawMessage `json:"detail"`
-}
-
 func (c *Client) doRaw(ctx context.Context, method string, path string, body any) ([]byte, error) {
 	if c.timeout > 0 && ctx != nil {
 		var cancel context.CancelFunc
@@ -49,10 +45,7 @@ func (c *Client) doRaw(ctx context.Context, method string, path string, body any
 	if err != nil {
 		return nil, err
 	}
-	up, err = up.Parse(path)
-	if err != nil {
-		return nil, err
-	}
+	up = up.JoinPath(path)
 
 	for attempt := 0; ; attempt++ {
 		var rd io.Reader
@@ -89,9 +82,11 @@ func (c *Client) doRaw(ctx context.Context, method string, path string, body any
 				StatusCode: resp.StatusCode,
 				Body:       respBody,
 			}
-			var apiRespErr ApiRespError
-			if err := json.Unmarshal(respBody, &apiRespErr); err == nil {
-				apiErr.Detail = apiRespErr.Detail
+			var parsed struct {
+				Detail json.RawMessage `json:"detail"`
+			}
+			if err := json.Unmarshal(respBody, &parsed); err == nil {
+				apiErr.Detail = parsed.Detail
 			}
 			if resp.StatusCode == http.StatusTooManyRequests ||
 				resp.StatusCode >= http.StatusInternalServerError {
