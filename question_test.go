@@ -63,6 +63,16 @@ func TestQuestionMarshalJSON(t *testing.T) {
 			},
 			want: `{"type":"noul","instructions":"Is this urgent?","criteria":{"true":"Needs action","false":"Can wait"}}`,
 		},
+		{
+			name: "box without criteria",
+			q:    &Box{Instructions: String("the coffee mug in photo")},
+			want: `{"type":"box","instructions":"the coffee mug in photo"}`,
+		},
+		{
+			name: "box value with object instructions",
+			q:    Box{Instructions: Object{"target": "the person matching 9a21c7d3-badge", "image": "photo"}},
+			want: `{"type":"box","instructions":{"target":"the person matching 9a21c7d3-badge","image":"photo"}}`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -107,6 +117,8 @@ func TestQuestionTypes(t *testing.T) {
 		{&Score{}, QuestionTypeScore},
 		{Noul{}, QuestionTypeNoul},
 		{&Noul{}, QuestionTypeNoul},
+		{Box{}, QuestionTypeBox},
+		{&Box{}, QuestionTypeBox},
 	}
 	for _, tt := range tests {
 		if got := tt.question.T(); got != tt.want || got.String() != string(tt.want) {

@@ -2,7 +2,7 @@
 
 [English](README.md) · [简体中文](README_zh.md)
 
-[TypeSafe AI](https://typesafe.ai/) 的非官方 Go SDK。你可以把文本或结构化数据交给 System One，使用 Jev 提出不同类型的问题，并以 Go 类型读取答案；也可以查询可用模型。
+[TypeSafe AI](https://typesafe.ai/) 的非官方 Go SDK。你可以把文本、结构化数据或图片交给 System One，使用 Jev 提出不同类型的问题，并以 Go 类型读取答案；也可以查询可用模型。
 
 本项目由社区维护，与 TypeSafe AI 没有关联。
 
@@ -67,8 +67,9 @@ func main() {
 | `Choice` | 从命名选项中选出一个 | 必填 `Object`，描述各选项；最多 255 项 |
 | `Score` | 按有序等级评分 | 必填 `Array`，包含 2–10 个等级描述 |
 | `Noul` | 提出是/否问题 | 可选 `Object`，描述 `true` 和 `false` |
+| `Box` | 找出某个目标在图片中的位置 | 无；见[图片与 Box 问题](#图片与-box-问题) |
 
-`Choice`、`Score` 和 `Noul` 都可以使用值或指针。放入 `Questions` 时，值会被复制；如果希望之后修改原结构体的字段时也更新请求中的问题，请使用指针。
+`Choice`、`Score`、`Noul` 和 `Box` 都可以使用值或指针。放入 `Questions` 时，值会被复制；如果希望之后修改原结构体的字段时也更新请求中的问题，请使用指针。
 
 一次调用可以针对同一份状态提出不同类型的问题：
 
@@ -102,7 +103,7 @@ impact := response.Scores()["impact"]
 fmt.Println(owner.Choice, owner.Confidence, impact.Score)
 ```
 
-这里的 `client` 是 `*typesafe.Client`，`ctx` 是 `context.Context`。`Choices()`、`Scores()` 和 `Nouls()` 分别返回对应类型的答案映射；也可以直接读取 `response.Answers`。
+这里的 `client` 是 `*typesafe.Client`，`ctx` 是 `context.Context`。`Choices()`、`Scores()`、`Nouls()` 和 `Boxes()` 分别返回对应类型的答案映射；也可以直接读取 `response.Answers`。
 
 `state` 和每个问题的 `Instructions` 都支持 `String`、`Object` 和 `Array`。如果问题需要附带上下文，可以把问题和数据放在同一个 `Object` 中：
 
@@ -114,6 +115,47 @@ instructions := typesafe.Object{
 ```
 
 对于需要明确元素类型的集合，也可使用 `TArray[V]` 和 `TObject[K, V]`；其中的元素和映射键仍需能够编码为 JSON。请求结构和各类问题的限制见 [TypeSafe API 文档](https://docs.typesafe.ai/api)。
+
+## 图片与 Box 问题
+
+> 图片和 Box 问题目前是 [Dreamer-ready](https://docs.typesafe.ai/images) 状态，属于实验性功能，适合做原型。请求格式、答案和各项限制都可能随版本变化。
+
+只要请求中包含图片或 Box 问题，就必须带上 `TypeSafe-Danger-Zone-Images: true` 请求头。SDK 不会自动添加，请传入 `WithImages()`。Box 问题还需要 Jev 1.14，请选择 `ModelJevPreview`（`jev-preview`）或 `jev-1.14.0`。
+
+每张图片在 `Assets` 中登记一次，键是一个引用字符串。把这个引用写在 state、instructions 或 criteria 中需要图片的位置即可，可以是整个值，也可以嵌在一段文字中间。API 按纯文本匹配引用，所以引用不能和正文意外重合；`NewAssetRef()` 会生成一个随机引用。
+
+```go
+photo, err := os.ReadFile("kitchen.jpg")
+if err != nil {
+	log.Fatal(err)
+}
+ref := typesafe.NewAssetRef()
+
+response, err := client.SystemOne(ctx,
+	typesafe.Object{"photo": ref},
+	typesafe.Questions{
+		"mug_visible": typesafe.Noul{Instructions: typesafe.String("`photo` 中有咖啡杯吗？")},
+		"mug":         typesafe.Box{Instructions: typesafe.String("`photo` 中的咖啡杯")},
+	},
+	typesafe.WithRequestModel(typesafe.ModelJevPreview),
+	typesafe.WithAssets(typesafe.Assets{ref: typesafe.Image{Data: photo}}),
+	typesafe.WithImages(),
+)
+if err != nil {
+	log.Fatal(err)
+}
+
+mug := response.Boxes()["mug"]
+fmt.Println(mug.Box.Top, mug.Box.Bottom, mug.Box.Left, mug.Box.Right)
+```
+
+Box 答案用四条边表示位置，每条边都是相对图片尺寸的比例：左上角为 (0, 0)，右下角为 (1, 1)。`Box.Pixels(width, height)` 会把它换算成 `image.Rectangle`，可以直接传给 `SubImage` 裁剪。`Confidence` 的类型是 `*float64`，模型没有给出置信度时为 `nil`。即使图片里没有目标，Box 问题也总会返回一个框，所以建议像上面那样同时问一个 `Noul`。
+
+图片也可以放在问题的 `Instructions` 或 `Criteria` 中，例如 ``typesafe.String("`door` 中的人是这张工牌照片上的人吗：" + badgeRef + "？")``。
+
+**图片数据。** `Image.Data` 存放 PNG 或 JPEG 文件的字节。`Format`（`ImageFormatPNG`、`ImageFormatJPG` 或 `ImageFormatJPEG`）留空时会根据文件内容自动识别。如果手上是 base64 文本，可以用 `ImageFromBase64`。图片必须是静态 PNG 或 JPEG，每条边 280–1568 像素，单个文件不超过 16 MiB，整个请求不超过 32 MiB。完整限制见 [Images](https://docs.typesafe.ai/images#limits)。
+
+**上传方式。** 带图片的请求默认以 `multipart/form-data` 发送，每张图片是一个文件分段，这也是 TypeSafe 推荐的方式。传入 `WithBase64Assets()` 则改为把图片 base64 编码后放进 JSON 请求体。base64 会让每张图片增大约三分之一，而且图片格式必须能被识别，或者在 `Format` 中显式指定。
 
 ## 配置
 
@@ -140,8 +182,21 @@ client := typesafe.NewClient(
 
 ```go
 response, err := client.SystemOne(ctx, state, questions,
-	typesafe.WithRequestModel("jev-latest"))
+	typesafe.WithRequestModel(typesafe.ModelJevPreview))
 ```
+
+`SystemOne` 支持以下单次请求选项：
+
+| 选项 | 作用 |
+| --- | --- |
+| `WithRequestModel` | 本次请求使用的模型；`ModelJevLatest` 和 `ModelJevPreview` 是两个别名常量 |
+| `WithAssets` | 请求中引用的图片；多次调用会合并 |
+| `WithBase64Assets` | 把图片 base64 编码后放进 JSON，而不是作为 multipart 文件分段发送 |
+| `WithImages` | 发送 `TypeSafe-Danger-Zone-Images: true`，使用图片和 Box 问题时必须加 |
+| `WithLongContext` | 发送 `TypeSafe-Danger-Zone-Long-Context: true`，把两项上下文上限都提高到 262k token |
+| `WithRequestHeader` | 为本次请求添加任意其他 HTTP 请求头 |
+
+长上下文比默认上限更慢，准确率也更低，只在确实需要时开启。详见 [Long context](https://docs.typesafe.ai/models#long-context)。
 
 ## 模型与错误处理
 
@@ -170,5 +225,6 @@ if errors.As(err, &apiErr) {
 
 - [TypeSafe API 文档](https://docs.typesafe.ai/api)
 - [TypeSafe 模型文档](https://docs.typesafe.ai/models)
+- [Images](https://docs.typesafe.ai/images) 与 [Box](https://docs.typesafe.ai/primitives/box)
 
 英文版请见 [README.md](README.md)。

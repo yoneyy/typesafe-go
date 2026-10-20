@@ -6,6 +6,7 @@ var (
 	_ Question = (*Choice)(nil)
 	_ Question = (*Score)(nil)
 	_ Question = (*Noul)(nil)
+	_ Question = (*Box)(nil)
 )
 
 type QuestionType string
@@ -22,7 +23,7 @@ const (
 )
 
 type Question interface {
-	T() QuestionType // choice score noul
+	T() QuestionType // choice score noul box
 }
 
 type Questions map[string]Question
@@ -70,4 +71,18 @@ func (n Noul) MarshalJSON() ([]byte, error) {
 		Type QuestionType `json:"type"`
 		*payload
 	}{n.T(), (*payload)(&n)})
+}
+
+type Box struct {
+	Instructions Pandora `json:"instructions"`
+}
+
+func (Box) T() QuestionType { return QuestionTypeBox }
+
+func (b Box) MarshalJSON() ([]byte, error) {
+	type payload Box
+	return json.Marshal(struct {
+		Type QuestionType `json:"type"`
+		*payload
+	}{b.T(), (*payload)(&b)})
 }

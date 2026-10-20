@@ -54,6 +54,46 @@ func TestSystemOneResponseDecodeAndRoundTrip(t *testing.T) {
 	assertJSONEqual(t, mixedAnswersJSON, encoded)
 }
 
+const boxAnswersJSON = `{
+	"model":"jev-1.14.0",
+	"usage":{"input_tokens":290,"output_tokens":21},
+	"answers":{
+		"mug":{"type":"box","box":{"top":0.25,"bottom":0.82,"left":0.44,"right":0.84},"confidence":0.92},
+		"plate":{"type":"box","box":{"top":0.2,"bottom":0.66,"left":0.19,"right":0.68},"confidence":null},
+		"mug_visible":{"type":"noul","noul":0.97}
+	}
+}`
+
+func TestSystemOneResponseDecodesBoxAnswers(t *testing.T) {
+	var response SystemOneResponse
+	if err := json.Unmarshal([]byte(boxAnswersJSON), &response); err != nil {
+		t.Fatal(err)
+	}
+	boxes := response.Boxes()
+	if len(boxes) != 2 || len(response.Nouls()) != 1 {
+		t.Fatalf("unexpected answer counts: boxes=%d nouls=%d", len(boxes), len(response.Nouls()))
+	}
+	mug := boxes["mug"]
+	if mug.Type != AnswerTypeBox || mug.Box != (BoxCoordinates{Top: 0.25, Bottom: 0.82, Left: 0.44, Right: 0.84}) {
+		t.Errorf("mug answer = %+v", mug)
+	}
+	if mug.Confidence == nil || *mug.Confidence != 0.92 {
+		t.Errorf("mug confidence = %v, want 0.92", mug.Confidence)
+	}
+	if plate := boxes["plate"]; plate.Confidence != nil {
+		t.Errorf("plate confidence = %v, want nil", *plate.Confidence)
+	}
+	if got := response.Answers["mug"].T(); got != AnswerTypeBox || got.String() != "box" {
+		t.Errorf("mug answer type = %q", got)
+	}
+
+	encoded, err := json.Marshal(response)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertJSONEqual(t, boxAnswersJSON, encoded)
+}
+
 func TestSystemOneResponseRejectsInvalidAnswers(t *testing.T) {
 	tests := []struct {
 		name string
@@ -132,6 +172,7 @@ func TestAnswerHelpersReturnOnlyMatchingTypes(t *testing.T) {
 		"choice": ChoiceAnswer{Choice: "a"},
 		"score":  ScoreAnswer{Score: 2},
 		"noul":   NoulAnswer{Noul: 0.5},
+		"box":    BoxAnswer{Box: BoxCoordinates{Top: 0.1, Bottom: 0.9, Left: 0.2, Right: 0.8}},
 	}}
 	if !reflect.DeepEqual(response.Choices(), map[string]ChoiceAnswer{"choice": {Choice: "a"}}) {
 		t.Errorf("Choices() = %#v", response.Choices())
@@ -141,5 +182,8 @@ func TestAnswerHelpersReturnOnlyMatchingTypes(t *testing.T) {
 	}
 	if !reflect.DeepEqual(response.Nouls(), map[string]NoulAnswer{"noul": {Noul: 0.5}}) {
 		t.Errorf("Nouls() = %#v", response.Nouls())
+	}
+	if !reflect.DeepEqual(response.Boxes(), map[string]BoxAnswer{"box": {Box: BoxCoordinates{Top: 0.1, Bottom: 0.9, Left: 0.2, Right: 0.8}}}) {
+		t.Errorf("Boxes() = %#v", response.Boxes())
 	}
 }

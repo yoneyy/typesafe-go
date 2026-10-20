@@ -26,19 +26,25 @@ func (e ApiError) Error() string {
 }
 
 func (c *Client) doRaw(ctx context.Context, method string, path string, body any) ([]byte, error) {
-	if c.timeout > 0 && ctx != nil {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.timeout)
-		defer cancel()
-	}
-
-	var bodyByte []byte
+	var (
+		bodyByte    []byte
+		contentType string
+	)
 	if body != nil {
 		b, err := json.Marshal(body)
 		if err != nil {
 			return nil, err
 		}
-		bodyByte = b
+		bodyByte, contentType = b, "application/json"
+	}
+	return c.send(ctx, method, path, bodyByte, contentType, nil)
+}
+
+func (c *Client) send(ctx context.Context, method string, path string, bodyByte []byte, contentType string, header http.Header) ([]byte, error) {
+	if c.timeout > 0 && ctx != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, c.timeout)
+		defer cancel()
 	}
 
 	up, err := url.Parse(c.baseURL)
@@ -56,9 +62,14 @@ func (c *Client) doRaw(ctx context.Context, method string, path string, body any
 		if err != nil {
 			return nil, fmt.Errorf("typesafe: built request: %w", err)
 		}
+		for k, vs := range header {
+			for _, v := range vs {
+				req.Header.Add(k, v)
+			}
+		}
 		req.Header.Set("Authorization", "Bearer "+c.apiKey)
-		if bodyByte != nil {
-			req.Header.Set("Content-Type", "application/json")
+		if contentType != "" {
+			req.Header.Set("Content-Type", contentType)
 		}
 
 		resp, err := c.httpClient.Do(req)
