@@ -7,7 +7,12 @@ import (
 )
 
 const (
-	defaultModel      = "jev-latest"
+	ModelJevLatest  = "jev-latest"
+	ModelJevPreview = "jev-preview"
+)
+
+const (
+	defaultModel      = ModelJevLatest
 	defaultBaseURL    = "https://api.typesafe.ai/v1"
 	defaultTimeout    = 1 * time.Minute
 	defaultMaxRetries = 3

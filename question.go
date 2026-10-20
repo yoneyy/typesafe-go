@@ -3,11 +3,8 @@ package typesafe
 import "encoding/json"
 
 var (
-	_ Question = Choice{}
 	_ Question = (*Choice)(nil)
-	_ Question = Score{}
 	_ Question = (*Score)(nil)
-	_ Question = Noul{}
 	_ Question = (*Noul)(nil)
 )
 
@@ -21,6 +18,7 @@ const (
 	QuestionTypeChoice QuestionType = "choice"
 	QuestionTypeScore  QuestionType = "score"
 	QuestionTypeNoul   QuestionType = "noul"
+	QuestionTypeBox    QuestionType = "box"
 )
 
 type Question interface {
